@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+img/
+img4k/
+*.html
+!core/shell.html
+!skill/**/*.html
+*.mp4
+*.mov
+*.wav
+.DS_Store
+core/fonts/*.woff2
+core/fonts/free-fonts.html

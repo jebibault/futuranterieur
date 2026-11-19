@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sérotonine bleue</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; transition: none; }
+  #stage { position: relative; width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; background: #000; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; cursor: pointer; }
+  #stage:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; }
+  #ctl { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; align-items: center; gap: clamp(4px, 1.2vmin, 12px);
+         padding: clamp(18px, 5vmin, 44px) max(12px, env(safe-area-inset-right, 0px)) clamp(6px, 1.4vmin, 12px) max(12px, env(safe-area-inset-left, 0px));
+         background: linear-gradient(to top, rgba(0, 0, 0, .78), rgba(0, 0, 0, 0)); color: #ece9df; opacity: 0; pointer-events: none; transition: opacity .25s; }
+  #ctl.show { opacity: 1; pointer-events: auto; }
+  #ctl button { flex: none; width: 40px; height: 40px; padding: 8px; margin: 0; background: none; border: 0; border-radius: 50%; color: inherit; cursor: pointer; }
+  #ctl button:hover { background: rgba(255, 255, 255, .12); }
+  #ctl button:focus-visible, #seek:focus-visible, #replay:focus-visible { outline: 2px solid #7fa2ff; outline-offset: 2px; }
+  #ctl svg { width: 100%; height: 100%; display: block; fill: currentColor; }
+  #ctl svg text { font: 700 7.5px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  #tm { flex: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; font-variant-numeric: tabular-nums; opacity: .85; white-space: nowrap; }
+  #seek { flex: 1; min-width: 0; height: 24px; margin: 0; background: none; cursor: pointer; -webkit-appearance: none; appearance: none; --p: 0%; }
+  #seek::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, #6f95ff var(--p), rgba(255, 255, 255, .28) var(--p)); }
+  #seek::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, #6f95ff var(--p), rgba(255, 255, 255, .28) var(--p)); }
+  #seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #ece9df; border: 0; }
+  #seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #ece9df; border: 0; }
+  @media (max-width: 520px) { #ctl button { width: 34px; height: 34px; padding: 7px; } #tm { font-size: 10.5px; } }
+  .ov { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; color: #e9e6dc;
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; text-align: center; cursor: pointer; user-select: none; }
+  .ov.on { display: flex; }
+  #start { background: #05070b center / cover no-repeat; }
+  #start::before { content: ""; position: absolute; inset: 0; background: rgba(4, 6, 10, .62); }
+  .ov > * { position: relative; }
+  .ttl { width: min(46%, 520px); mix-blend-mode: screen; }
+  .hint { margin-top: 2.2vmin; font-size: clamp(11px, 1.5vmin, 15px); letter-spacing: .28em; text-transform: uppercase; opacity: .72; }
+  .small { margin-top: 1.2vmin; font-size: clamp(10px, 1.35vmin, 13px); font-style: italic; opacity: .5; }
+  #end { background: #000; cursor: default; }
+  .ov { z-index: 2; }
+  #end p { margin: 0 0 .6em; font-size: clamp(12px, 1.9vmin, 18px); font-style: italic; opacity: .75; }
+  #replay { margin-top: 2.4vmin; background: none; color: #e9e6dc; border: 1px solid rgba(233, 230, 220, .45); padding: .7em 1.6em; font: inherit;
+           font-size: clamp(11px, 1.5vmin, 15px); letter-spacing: .28em; text-transform: uppercase; cursor: pointer; }
+  #replay:hover { border-color: #5f8cff; color: #b9ccff; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #666; font: 13px Georgia, serif; letter-spacing: .2em; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="film" width="1280" height="720"></canvas>
+  <div id="ctl" hidden>
+    <button id="bRw" type="button" aria-label="Reculer de 10 secondes"><svg viewBox="0 0 24 24"><path d="M12 5V1.5L7 6l5 4.5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/><text x="12" y="16.2" text-anchor="middle">10</text></svg></button>
+    <button id="bPlay" type="button" aria-label="Pause"><svg id="icPlay" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg><svg id="icPause" viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg></button>
+    <button id="bFf" type="button" aria-label="Avancer de 10 secondes"><svg viewBox="0 0 24 24"><path d="M12 5V1.5L17 6l-5 4.5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z"/><text x="12" y="16.2" text-anchor="middle">10</text></svg></button>
+    <span id="tm">0:00 / 0:00</span>
+    <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Position dans le film">
+    <button id="bSub" type="button" aria-label="Masquer les sous-titres"><svg viewBox="0 0 24 24"><path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm1 2v8h14V8z"/><path d="M7 13h4v1.600H7zM12.500 13H17v1.600h-4.500z"/></svg></button>
+    <button id="bMute" type="button" aria-label="Couper le son"><svg id="icVol" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 19V5L7.500 9.500zM14.500 8.200v7.600a4.300 4.300 0 0 0 0-7.600zM14.500 4.600v2.100a5.600 5.600 0 0 1 0 10.600v2.100a7.600 7.600 0 0 0 0-14.800z"/></svg><svg id="icMute" viewBox="0 0 24 24"><path d="M4 9.500v5h3.500L12 19V5L7.500 9.500zM15.300 9.300l-1.400 1.400 1.300 1.300-1.300 1.300 1.400 1.400 1.300-1.300 1.300 1.300 1.400-1.400-1.300-1.300 1.300-1.300-1.400-1.400-1.300 1.300z"/></svg></button>
+    <button id="bFs" type="button" aria-label="Plein écran"><svg viewBox="0 0 24 24"><path d="M5 5h5v2H7v3H5zM14 5h5v5h-2V7h-3zM5 14h2v3h3v2H5zM17 14h2v5h-5v-2h3z"/></svg></button>
+  </div>
+  <div id="loading">…</div>
+  <div id="start" class="ov"><img class="ttl" id="ttl" alt="Sérotonine bleue"><div class="hint">Cliquer pour lancer le film</div><div class="small">avec le son</div></div>
+  <div id="end" class="ov"><p>d’après « Sérotonine bleue »</p><p style="opacity:.5">Chroniques d’un futur antérieur</p><button id="replay">Revoir</button></div>
+</div>
+<script>
+/*ASSETS*/
+/*CFG*/
+document.getElementById('ttl').src = ASSETS.title;
+document.getElementById('start').style.backgroundImage = 'url(' + ASSETS.s1_brest + ')';
+</script>
+<script>
+/*FILM*/
+</script>
+</body>
+</html>

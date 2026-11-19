@@ -1,0 +1,1 @@
+Describe here, in a few sentences, the drawing style of your film: line, colours, light, what must never appear. This text is added to every drawing prompt.
